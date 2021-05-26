@@ -271,7 +271,7 @@ function render(element, container) {
 
 我们也需要处理文本`element`，如果`element`的类型是`TEXT_ELEMENT`，我们将创建一个文本节点而不是常规节点。
 
-我们需要做的最后一件事就是将`props`元素分配给节点。
+我们需要做的最后一件事就是将`props`属性分配给节点。
 
 ```js
 const isProperty = key => key !== "children"
@@ -283,4 +283,92 @@ Object.keys(element.props)
 });
 ```
 
+就是这样，我们现在有一个可以渲染`JSX`和`DOM`的库。
 
+## Step III Concurrent Mode
+
+在这之前，在我们开始添加更多的代码之前，我们需要对代码进行重构。
+
+有一个问题就是递归的调用。
+
+```js
+element.props.children.forEach(child =>
+  render(child, dom)
+)
+```
+
+一旦开始渲染，我们不会停止直到我们已经渲染出完整的元素树。如果元素树太大，它可能会阻塞主线程很久，如果浏览器需要做高优先级的事情，比如用户输入或保持动画流畅，它将不得不等到渲染完成。
+
+所以我们将把工作分解成小单元，当我们完成每个单元后，如果有什么需要做的，我们会让浏览器中断渲染。
+
+我们使用 [requestIdleCallback][] 循环，你可以把`requestIdleCallback`看做一个`setTimeout`，但是不是我们我们告诉它何时运行，浏览器会在主线程空闲的时运行回调。
+
+```js
+function wookLoop(deadline) {
+  
+  // ...
+
+  requestIdleCallback(wookLoop)
+}
+
+requestIdleCallback(wookLoop)
+```
+
+`React`不再使用 `requestIdleCallback`，现在它使用[scheduler][]，但对于这个用例，概念上是相同的。
+
+`requestIdleCallback`也给我们一个`deadline`参数，我们可以用它来检查还有多少时间，直到浏览器需要再次控制。
+
+截止2019年11月，React并发模式还不稳定，循环的稳定版看起来更像这样：
+```js
+while (nextUnitOfWork) {    
+  nextUnitOfWork = performUnitOfWork(   
+    nextUnitOfWork  
+  ) 
+}
+```
+
+开始使用循环，我们需要设置第一个工作单元，然后编写一个`performUnitOfWork`函数，它不仅执行工作，而且返回下一个工作单元。
+
+```js
+let nextUnitOfWork = null
+
+function wookLoop(deadline) {
+  let shouldYield = false
+
+  while(nextUnitOfWork && !shouldYield) {
+    nextUnitOfWork = performUnitOfWork(nextUnitOfWork)
+    shouldYield = deadline.timeRemaining() < 1
+  }
+
+  requestIdleCallback(wookLoop)
+}
+
+requestIdleCallback(wookLoop)
+
+function performUnitOfWork(nextUnitOfWork) {
+
+}
+```
+
+## Step IV: Fibers
+
+
+
+
+
+
+<!-- ## Step V: Render and Commit Phases -->
+
+
+<!-- ## Step VI: Reconciliation -->
+
+
+<!-- ## Step VII: Function Components -->
+
+
+<!-- ## Step VIII: Hooks -->
+
+
+
+[requestIdleCallback]: https://developer.mozilla.org/zh-CN/docs/Web/API/Window/requestIdleCallback "requestIdleCallback"
+[scheduler]: https://github.com/facebook/react/tree/master/packages/scheduler "scheduler"

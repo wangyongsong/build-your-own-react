@@ -1,9 +1,9 @@
 /*
  * @Author: wangyongsong
  * @Date: 2021-05-24 19:29:08
- * @LastEditTime: 2021-05-26 09:52:00
+ * @LastEditTime: 2021-05-26 15:24:13
  * @LastEditors: Please set LastEditors
- * @Description: Step II: The `render` Function
+ * @Description: Step III: Concurrent Mode
  * @FilePath: /build-your-own-react/React.js
  */
 (() => {
@@ -35,6 +35,7 @@
         ? document.createTextNode("")
         : document.createElement(element.type);
 
+        
     const isProperty = (key) => key !== "children";
 
     Object.keys(element.props)
@@ -47,7 +48,26 @@
       render(child);
     });
 
-    if (container) container.appendChild(dom);
+    if(container) container.appendChild(dom)
+  }
+
+  let nextUnitOfWork = null
+
+  function wookLoop(deadline) {
+    let shouldYield = false
+
+    while(nextUnitOfWork && !shouldYield) {
+      nextUnitOfWork = performUnitOfWork(nextUnitOfWork)
+      shouldYield = deadline.timeRemaining() < 1
+    }
+
+    requestIdleCallback(wookLoop)
+  }
+
+  requestIdleCallback(wookLoop)
+
+  function performUnitOfWork(nextUnitOfWork) {
+
   }
 
   const Didact = {
