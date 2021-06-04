@@ -3,7 +3,7 @@
  * @Date: 2021-05-24 19:29:08
  * @LastEditTime: 2021-06-03 18:07:57
  * @LastEditors: Please set LastEditors
- * @Description: Step III: Concurrent Mode
+ * @Description: Step V: Render and Commit Phases
  * @FilePath: /build-your-own-react/React.js
  */
 (() => {
