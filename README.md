@@ -352,15 +352,297 @@ function performUnitOfWork(nextUnitOfWork) {
 
 ## Step IV: Fibers
 
+为了组织工作单元，我们需要一个数据结构：fiber tree。
+
+每种元素都有一个fiber，每个fiber都是一个单元。
+
+让我们看一个例子，假设我们想呈现这个element tree
+```jsx
+Didact.render(
+  <div>
+    <h1>
+      <p />
+      <a />
+    </h1>
+    <h2 />
+  </div>,
+  container
+)
+```
+在`render`中，我们将创建一个fiber，并且将它设置为`nextUnitOfWork`，其余的工作将发生在`performUnitOfWork`函数，在那里我们将为fiber做三件事情：
+1. 将元素加到DOM
+2. 为元素的children创建fibers
+3. 选择下一个工作单元
 
 
+![fiber-tree-1.png](http://ww1.sinaimg.cn/large/006tISuoly1gr54oml0jcj30ls0hu0tp.jpg)
+
+这样的数据结构的目标之一使查找下一个工作单元更容易，这就是每个fiber都会有连接到它的第一个child，它的下一个兄弟和父亲。
+
+当我们在一个fiber完成工作，如果它有child，那么该fiber将是下一个工作单元。
+
+在我们的示例中，当我们完成`div`fiber的工作时，下一个工作单元将是`h1`fiber。
+
+如果fiber没有child，我们就会使用兄弟作为下一个工作单元。
+
+例如，`p`fiber没有child所以在我们完成后，移到`a`fiber。 (`<p>` -> `<a>`)
+
+![fiber-tree-2.png](http://ww1.sinaimg.cn/large/006tISuoly1gr54on05cej30la0h6gmr.jpg)
+
+如果fiber没有child也没有兄弟，我们就去找“叔叔”：父亲的兄弟，比如例子中的`a`和`h2`。 (`<a>` -> `<h1>` -> `<h2>`)
+
+而且，如果父亲没有兄弟,我们就继续往上走，直到找到一个有兄弟，或者一直找到根节点(root)，如果我们已经找到root，说明已经完成了所有的渲染工作。
+
+现在开始写代码。
+
+首先，我们从`render`函数中删除这段代码。
+```js
+ const dom =
+   element.type === "TEXT_ELEMENT"
+     ? document.createTextNode("")
+     : document.createElement(element.type);
+
+     
+ const isProperty = (key) => key !== "children";
+
+ Object.keys(element.props)
+   .filter(isProperty)
+   .forEach((name) => {
+     dom[name] = element.props[name];
+   });
+
+ element.props.children.forEach((child) => {
+   render(child);
+ });
+
+ if(container) container.appendChild(dom)
+```
+
+我们将创建DOM节点的函数保留在自己的函数中，稍后将使用它。
+
+```js
+function createDom(fiber) {
+ const dom =
+   element.type === "TEXT_ELEMENT"
+     ? document.createTextNode("")
+     : document.createElement(element.type);
+
+     
+ const isProperty = (key) => key !== "children";
+
+ Object.keys(element.props)
+   .filter(isProperty)
+   .forEach((name) => {
+     dom[name] = element.props[name];
+   });
+ return dom
+}
+
+function render(element, container) {
+ // TODO set next unit of work
+}
+```
+
+在`render`函数中，我们将`nextUnitOfWork`设置为fiber根节点(root)。
+
+```js
+function render(element, container) {
+ nextUnitOfWork = {
+   dom: container,
+   props: {
+     children: [element]
+   }
+ }
+}
+```
+
+然后当浏览器准备好时，它将调用`workLoop`，我们将开始处理root。
+
+```js
+function performUnitOfWork(nextUnitOfWork) {
+   // TODO add dom node
+   // TODO create new fibers
+   // TODO return next unit of work
+}
+```
+
+首先我们创建一个节点，并将它添加到DOM。
+
+我们在`fiber.dom`属性中追踪DOM。
+
+```js
+  function performUnitOfWork(fiber) {
+    console.log(`fiber`, fiber);
+    // TODO add dom node
+    if (!fiber.dom) {
+      fiber.dom = createDom(fiber);
+    }
+    if (fiber.parent) {
+      fiber.parent.dom.appendChild(fiber.dom);
+    }
+    // TODO create new fibers
+    // TODO return next unit of work
+  }
+```
+
+我们为每个child创建一个fiber。
+
+```js
+  function performUnitOfWork(fiber) {
+    // TODO add dom node
+    if (!fiber.dom) {
+      fiber.dom = createDom(fiber);
+    }
+    if (fiber.parent) {
+      fiber.parent.dom.appendChild(fiber.dom);
+    }
+    // TODO create new fibers
+    const elements = fiber.props.children;
+    let index = 0;
+    let preSibling = null;
+
+    while (index < elements.length) {
+      const element = elements[index]
+
+      const newFiber = {
+        type: element.type,
+        props: element.props,
+        parent: fiber,
+        dom: null
+      }
+
+    }
+
+    // TODO return next unit of work
+  }
+```
+
+我们将它加入fiber tree根据它是否是第一个子节点，将它设置为子节点或者兄弟节点。
+
+```js
+   // TODO create new fibers
+   //  ...
+   if(index === 0) {
+       fiber.child = newFiber
+   } else {
+       preSibling.sibling = newFiber
+   }
+
+   preSibling = newFiber
+   index++
+```
+
+最后，我们去寻找下一个工作单元。我们首先尝试用child，然后是兄弟，然后叔叔以此类推。
+```js
+    // TODO return next unit of work
+    if (fiber.child) {
+      return fiber.child;
+    }
+
+    let nextFiber = fiber;
+    while (nextFiber) {
+      if (nextFiber.sibling) {
+        return nextFiber.sibling
+      }
+      nextFiber = nextFiber.parent
+    }
+```
+这就是我们的`performUnitOfWork`
+```js
+  function performUnitOfWork(fiber) {
+    // TODO add dom node
+    if (!fiber.dom) {
+      fiber.dom = createDom(fiber);
+    }
+    if (fiber.parent) {
+      fiber.parent.dom.appendChild(fiber.dom);
+    }
+    // TODO create new fibers
+    const elements = fiber.props.children;
+    let index = 0;
+    let preSibling = null;
+
+    while (index < elements.length) {
+      const element = elements[index];
+
+      const newFiber = {
+        type: element.type,
+        props: element.props,
+        parent: fiber,
+        dom: null,
+      };
+
+      if (index === 0) {
+        fiber.child = newFiber;
+      } else {
+        preSibling.sibling = newFiber;
+      }
+
+      preSibling = newFiber;
+      index++;
+    }
+
+    // TODO return next unit of work
+    if (fiber.child) {
+      return fiber.child;
+    }
+
+    let nextFiber = fiber;
+    while (nextFiber) {
+      if (nextFiber.sibling) {
+        return nextFiber.sibling
+      }
+      nextFiber = nextFiber.parent
+    }
+  }
+```
 
 
+## Step V: Render and Commit Phases
 
-<!-- ## Step V: Render and Commit Phases -->
+```js
+function performUnitOfWork(fiber) {
+
+ // ...
+
+  if (fiber.parent) {
+    fiber.parent.dom.appendChild(fiber.dom)
+  }
+
+ //  ...
+
+}
+```
+
+我们每次处理一个元素时，我们都会向DOM添加一个新的节点。**浏览器可能会在我们完成渲染整个树之前中断我们的工作**。在这种情况下，用户将看到一个不完整的UI。我们不希望那样。
+
+因此，我们需要从这里删除改变DOM的部分。
+
+```js
+    if (fiber.parent) {
+      fiber.parent.dom.appendChild(fiber.dom);
+    }
+ ```
+
+相反，我们将追踪render tree的root，我们将它称之为正在进行的root或者`wipRoot`
+
+```js
+  let nextUnitOfWork = null;
+  let wipRoot = null
+
+  function render(element, container) {
+    wipRoot = {
+      dom: container,
+      props: {
+        children: [element],
+      },
+    };
+    nextUnitOfWork = wipRoot
+  }
+```
 
 
-<!-- ## Step VI: Reconciliation -->
+## Step VI: Reconciliation
 
 
 <!-- ## Step VII: Function Components -->

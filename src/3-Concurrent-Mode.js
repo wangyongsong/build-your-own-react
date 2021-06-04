@@ -1,7 +1,7 @@
 /*
  * @Author: wangyongsong
  * @Date: 2021-05-24 19:29:08
- * @LastEditTime: 2021-05-26 15:24:13
+ * @LastEditTime: 2021-06-03 15:45:53
  * @LastEditors: Please set LastEditors
  * @Description: Step III: Concurrent Mode
  * @FilePath: /build-your-own-react/React.js
@@ -29,29 +29,34 @@
     };
   }
 
-  function render(element, container) {
+  function createDom(fiber) {
     const dom =
       element.type === "TEXT_ELEMENT"
         ? document.createTextNode("")
         : document.createElement(element.type);
-
+  
         
     const isProperty = (key) => key !== "children";
-
+  
     Object.keys(element.props)
       .filter(isProperty)
       .forEach((name) => {
         dom[name] = element.props[name];
       });
-
-    element.props.children.forEach((child) => {
-      render(child);
-    });
-
-    if(container) container.appendChild(dom)
+    return dom
   }
 
   let nextUnitOfWork = null
+
+  function render(element, container) {
+    nextUnitOfWork = {
+      dom: container,
+      props: {
+        children: [element]
+      }
+    }
+  }
+
 
   function wookLoop(deadline) {
     let shouldYield = false
@@ -67,7 +72,7 @@
   requestIdleCallback(wookLoop)
 
   function performUnitOfWork(nextUnitOfWork) {
-
+      // TODO
   }
 
   const Didact = {
