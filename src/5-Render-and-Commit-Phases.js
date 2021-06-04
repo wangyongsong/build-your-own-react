@@ -48,6 +48,10 @@
   let nextUnitOfWork = null;
   let wipRoot = null
 
+  function commitRoot() {
+    // TODO add nodes to dom
+  }
+
   function render(element, container) {
     wipRoot = {
       dom: container,
@@ -66,6 +70,10 @@
       shouldYield = deadline.timeRemaining() < 1;
     }
 
+    if(!nextUnitOfWork && wipRoot) {
+      commitRoot()
+    }
+
     requestIdleCallback(wookLoop);
   }
 
@@ -76,10 +84,6 @@
     if (!fiber.dom) {
       fiber.dom = createDom(fiber);
     }
-    
-    // if (fiber.parent) {
-    //   fiber.parent.dom.appendChild(fiber.dom);
-    // }
 
     // TODO create new fibers
     const elements = fiber.props.children;

@@ -641,8 +641,28 @@ function performUnitOfWork(fiber) {
   }
 ```
 
+一旦我们完成了所有工作（我们知道这一点是因为没有下一个工作单元）我们就将整个fiber tree提交给DOM。
 
-## Step VI: Reconciliation
+```js
+  function commitRoot() {
+    // TODO add nodes to dom
+  }
+
+  function wookLoop(deadline) {
+
+    // ...
+
+    if(!nextUnitOfWork && wipRoot) {
+      commitRoot()
+    }
+
+    // ...
+  }
+```
+我们在`commitRoot`函数中执行，我们将递归所有节点添加到DOM中。
+
+
+<!-- ## Step VI: Reconciliation -->
 
 
 <!-- ## Step VII: Function Components -->
